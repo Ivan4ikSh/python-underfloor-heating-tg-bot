@@ -20,6 +20,7 @@ app_data = config_data.get('appdata', [])
 allowed_users = [user['tag'] for user in config_data.get('allowed_users', [])]
 
 # Установка констант
-API_TOKEN = app_data[0]['data']
+CLIENT_API_TOKEN = app_data[0]['data']
+MASTER_API_TOKEN = app_data[2]['data']
 BACKUP_PASSWORD = app_data[1]['data']
 ALLOWED_USERS = allowed_users
