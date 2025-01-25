@@ -4,11 +4,12 @@ from utils import load_bot_data, custom_print
 import signal
 import sys
 import time
-from config import API_TOKEN, BACKUP_PASSWORD, ALLOWED_USERS, BOT_MESSAGES_FILE
+from config import CLIENT_API_TOKEN, ALLOWED_USERS, BOT_MESSAGES_FILE
+import requests
 
-class Bot:
+class ClientBot:
     def __init__(self):
-        self.client_bot = telebot.TeleBot(API_TOKEN)
+        self.client_bot = telebot.TeleBot(CLIENT_API_TOKEN)
         self.sent_messages = []
         self.user_states = {}
         self.bot_data = load_bot_data(BOT_MESSAGES_FILE)
@@ -37,6 +38,31 @@ class Bot:
         response_msg = self.client_bot.send_message(message.chat.id, self.bot_messages[2]['text'].format(name=message.chat.first_name), reply_markup=markup)
         self.sent_messages.append(response_msg.message_id)
 
+    def send_message_to_bot(self, bot_token, chat_id, message):
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        params = {
+            "chat_id": chat_id,
+            "text": message
+        }
+        response = requests.post(url, params=params)
+        return response.json()
+
+    def send_order_to_master(self, order_data):
+        master_chat_id = 7975798590
+        message_text = (
+            f"Имя: {order_data['name']}\n"
+            f"Telegram: {order_data['tg']}\n"
+            f"Дата: {order_data['date']}\n"
+            f"Город: {order_data['city']}\n"
+            f"Адрес: {order_data['address']}\n"
+            f"Телефон: {order_data['phone']}\n"
+            f"Комментарий: {order_data['comment']}"
+        )
+        try:
+            self.send_message_to_bot("8171869512:AAHcaR7schcAyLz-VwUrleTU6Kjh_PpE_2M", master_chat_id, message_text)
+        except telebot.apihelper.ApiTelegramException as e:
+            custom_print(f"Ошибка при отправке сообщения: {e}")
+
     def callback_query(self, call):
         user_id = call.from_user.id
         if call.data == "create_order":
@@ -56,6 +82,7 @@ class Bot:
             name = self.user_states[user_id]["name"]
             city = self.user_states[user_id]["city"]
             address = self.user_states[user_id]["address"]
+            date = self.user_states[user_id]["date"]
             phone = self.user_states[user_id]["phone"]
             comment = self.user_states[user_id]["comment"]
 
@@ -63,8 +90,18 @@ class Bot:
             self.client_bot.send_message(call.message.chat.id, "Заявка принята в обработку, скоро мастер с вами свяжется для уточнения деталей.")
 
             # Вывод данных о заявке в консоль
-            custom_print(f"Создана заявка:\n{name}\nГород: {city}\nАдрес: {address}\nТелефон: {phone}\nКомментарий: {comment}")
+            custom_print(f"Создана заявка:\n{name}\n{city}\n{date}\nАдрес: {address}\nТелефон: {phone}\nКомментарий:\n{comment}")
 
+            order_data = {
+                "tg": "@"+call.from_user.username,
+                "name": self.user_states[user_id]["name"],
+                "city": self.user_states[user_id]["city"],
+                "date": self.user_states[user_id]["date"],
+                "address": self.user_states[user_id]["address"],
+                "phone": self.user_states[user_id]["phone"],
+                "comment": self.user_states[user_id]["comment"]
+            }
+            self.send_order_to_master(order_data)
             # Возвращаемся в главное меню
             self.start(call.message)
 
@@ -101,6 +138,7 @@ class Bot:
                 "state": "",
                 "name": "",
                 "city": "",
+                "date": "",
                 "address": "",
                 "phone": "",
                 "comment": ""
@@ -114,6 +152,7 @@ class Bot:
         user_id = message.from_user.id
         name = self.user_states.get(user_id, {}).get("name")
         city = self.user_states.get(user_id, {}).get("city")
+        date = self.user_states.get(user_id, {}).get("date")
         address = self.user_states.get(user_id, {}).get("address")
         phone = self.user_states.get(user_id, {}).get("phone")
         comment = self.user_states.get(user_id, {}).get("comment")
@@ -123,6 +162,7 @@ class Bot:
             f"<b>Имя</b>: {name}\n"
             f"<b>Город</b>: {city}\n"
             f"<b>Адрес</b>: {address}\n"
+            f"<b>Время</b>: {date}\n"
             f"<b>Телефон</b>: {phone}\n"
             f"<b>Комментарий</b>: {comment}\n"
             "\nВсе ли верно?"
@@ -145,6 +185,7 @@ class Bot:
                 "state": "enter_name",
                 "name": "",
                 "city": "",
+                "date": "",
                 "address": "",
                 "phone": "",
                 "comment": ""
@@ -167,6 +208,10 @@ class Bot:
             self.ask(message, self.order_messages[4]['text'], self.order_messages[4]['state'])
 
         elif self.user_states[user_id]["state"] == self.order_messages[4]['state']:
+            self.user_states[user_id]["date"] = message.text
+            self.ask(message, self.order_messages[5]['text'], self.order_messages[5]['state'])
+
+        elif self.user_states[user_id]["state"] == self.order_messages[5]['state']:
             self.user_states[user_id]["comment"] = message.text
             # Вызываем метод подтверждения данных
             self.confirm_order(message)
@@ -181,7 +226,7 @@ class Bot:
         main_btn = types.InlineKeyboardButton(text="Главное меню", callback_data="main_menu")
         markup.add(main_btn)
 
-        response_msg = self.client_bot.send_message(message.chat.id, "Текст, по всем вопросам обращаться по:\nпочта проекта, тг поддержки", reply_markup=markup)
+        response_msg = self.client_bot.send_message(message.chat.id, "Текст, по всем вопросам обращаться по следующим контактам:\nПочта: shupaevi000@gmail.com\nПоддержка: @IvanBusy", reply_markup=markup)
         self.sent_messages.append(response_msg.message_id)
 
     def handle_info(self, message):
@@ -213,6 +258,7 @@ class Bot:
         else:
             self.client_bot.send_message(message.chat.id, "У вас нет доступа к этой команде.")
             self.start(message)
+
 
     def run(self):
         @self.client_bot.message_handler(commands=['start'])
