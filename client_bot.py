@@ -4,7 +4,7 @@ from utils import load_bot_data, custom_print
 import signal
 import sys
 import time
-from config import CLIENT_API_TOKEN, ALLOWED_USERS, BOT_MESSAGES_FILE
+from config import CLIENT_API_TOKEN, MASTER_API_TOKEN, ALLOWED_USERS, BOT_MESSAGES_FILE
 import requests
 
 class ClientBot:
@@ -59,7 +59,7 @@ class ClientBot:
             f"Комментарий: {order_data['comment']}"
         )
         try:
-            self.send_message_to_bot("8171869512:AAHcaR7schcAyLz-VwUrleTU6Kjh_PpE_2M", master_chat_id, message_text)
+            self.send_message_to_bot(MASTER_API_TOKEN, master_chat_id, message_text)
         except telebot.apihelper.ApiTelegramException as e:
             custom_print(f"Ошибка при отправке сообщения: {e}")
 
